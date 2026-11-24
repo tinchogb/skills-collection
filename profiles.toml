@@ -1,0 +1,6 @@
+[profiles.research]
+skills = [
+    "zotero-cli",
+    "zotero-library-curator",
+    "zotero-semantic-tagger",
+]
