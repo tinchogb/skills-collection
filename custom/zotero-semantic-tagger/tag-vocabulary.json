@@ -1,0 +1,916 @@
+{
+  "rules": {
+    "version": 1,
+    "notes": "Single source of truth for tag + collection rules and the approved tag catalog. Read by zotero-semantic-tagger, zotero-library-curator and their lint scripts. No markdown mirror is maintained.",
+    "prefixes": [
+      {
+        "prefix": "_",
+        "kind": "status",
+        "boundary": "Workflow/status of MY reading or work on the paper (`_to-read`, `_reading`, `_key-paper`, `_implement`).",
+        "excludes": "Anything describing the paper's content."
+      },
+      {
+        "prefix": "met:",
+        "kind": "domain",
+        "boundary": "Research methodologies, experimental assays, and computational/statistical techniques, tasks or analyses APPLIED BY THE INVESTIGATOR; scoring/mathematical functions (`met:scoring-function`). Never a natural biophysical/biological phenomenon.",
+        "excludes": "ML architectures (`ml:`), runnable software (`tool:`), natural processes (`proc:`)."
+      },
+      {
+        "prefix": "ml:",
+        "kind": "domain",
+        "boundary": "Machine-learning or statistical model families, architectures, objectives, interpretation techniques (`ml:cnn`, `ml:gradient-boosting`).",
+        "excludes": "The task it solves (`met:`), a named runnable product (`tool:`)."
+      },
+      {
+        "prefix": "bio:",
+        "kind": "domain",
+        "boundary": "Molecular & structural entities: molecules, domains (`bio:rrm`, `bio:dsrbd`), regions (`bio:disordered-region`), chemical modifications at class level (`bio:rna-modification`), macromolecular interactions (`bio:rna-protein-interaction`), targets, pathways, organisms.",
+        "excludes": "Techniques or assays (`met:`), datasets (`data:`), processes (`proc:`), diseases (`dis:`)."
+      },
+      {
+        "prefix": "tool:",
+        "kind": "domain",
+        "boundary": "Runnable software, library, framework, pipeline or web server a user can execute (`tool:predprba`). Not models or methods merely described in a paper.",
+        "excludes": "`met:`/`ml:` concepts, databases (`data:`)."
+      },
+      {
+        "prefix": "data:",
+        "kind": "domain",
+        "boundary": "Dataset, repository, database or benchmark (`data:wwpdb`, `data:encode`).",
+        "excludes": "The experimental assay (`met:eclip`)."
+      },
+      {
+        "prefix": "proc:",
+        "kind": "domain",
+        "boundary": "Biological and biophysical processes/phenomena that occur in nature (`proc:disorder-to-order-transition`, `proc:phase-separation`, `proc:conformational-change`, `proc:chaperone-folding`, splicing, regulation).",
+        "excludes": "The method used to study it (`met:`), the entity involved (`bio:`)."
+      },
+      {
+        "prefix": "app:",
+        "kind": "domain",
+        "boundary": "Translational, engineering or clinical use cases/applications (`app:rna-therapeutics`, `app:aptamer-design`, `app:protein-engineering`, `app:synthetic-biology`).",
+        "excludes": "The design technique itself (`met:rna-design`), a disease (`dis:`)."
+      },
+      {
+        "prefix": "dis:",
+        "kind": "domain",
+        "boundary": "Diseases, clinical phenotypes or pathological conditions (`dis:cancer`, `dis:autoimmune-disease`, `dis:neurodegenerative-disease`). Class level only.",
+        "excludes": "Molecular targets (`bio:`), therapeutic use (`app:`)."
+      }
+    ],
+    "regex": {
+      "domain": "^(met|ml|bio|tool|data|proc|app|dis):[a-z0-9]+(-[a-z0-9]+)*$",
+      "status": "^_[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "count": {
+      "min": 1,
+      "max": 10,
+      "target_min": 4,
+      "target_max": 7
+    },
+    "ignore_tags": [
+      "zotmoov"
+    ],
+    "legacy_patterns": [
+      "^topic/",
+      "^type/"
+    ],
+    "rejected_prefixes": [
+      {
+        "prefix": "doc:",
+        "reason": "publication type, redundant with collections"
+      },
+      {
+        "prefix": "lang:",
+        "reason": "programming language, too low signal"
+      },
+      {
+        "prefix": "task:",
+        "reason": "overlaps met:"
+      }
+    ],
+    "new_prefix_policy": [
+      "Strictly orthogonal: captures an attribute none of the active prefixes can express, and no existing tag would need to move into it.",
+      "Demonstrated need: applies across at least 5 papers, listed as evidence.",
+      "Explicit user confirmation: propose prefix, boundary, examples and the 5+ papers in a table; create nothing until the user says yes. Then update rules.prefixes, rules.regex and this file's consumers."
+    ],
+    "interaction_rules": {
+      "allowed": [
+        "bio:protein-protein-interaction",
+        "bio:dna-protein-interaction",
+        "bio:rna-protein-interaction",
+        "bio:dna-dna-interaction",
+        "bio:rna-rna-interaction",
+        "bio:rna-dna-interaction"
+      ],
+      "forbidden_reversed": [
+        "bio:protein-dna-interaction",
+        "bio:protein-rna-interaction",
+        "bio:dna-rna-interaction"
+      ],
+      "pattern": "^bio:.+-interaction$",
+      "note": "Exactly these six exist, fixed component order. Tag every interaction type a paper treats. Any bio:*-interaction tag outside the allowed list is an error."
+    },
+    "base_tag_rules": [
+      {
+        "base": "bio:ncrna",
+        "rule": "Always pair a specific ncRNA subclass (bio:mirna, bio:circrna, bio:lncrna, bio:sirna, ...) with bio:ncrna. Enforced through the catalog 'requires' field."
+      },
+      {
+        "rule": "Stacking requirements: a catalog entry with 'requires' needs those tags on the same item (e.g. met:iclip requires met:clip-seq)."
+      }
+    ],
+    "granularity_anti_explosion": {
+      "rule": "Do not create hyper-specific biochemical or molecular subtype tags that would multiply without bound: individual RNA chemical modifications, individual point mutations, single residues, single named genes/proteins used only as an example. Stay at the functional-class level (bio:rna-modification) and compose with class tags (bio:ncrna, bio:mrna, bio:disordered-region). A named entity gets its own tag only when the paper is about that entity as a whole (bio:cas9, bio:pumilio, tool:catrapid).",
+      "forbidden_tags": [
+        "bio:m6a",
+        "bio:pseudouridine",
+        "bio:a-to-i-editing"
+      ],
+      "forbidden_patterns": [
+        "^bio:m[0-9]+[a-z]?$"
+      ]
+    },
+    "composition_rules": [
+      "Orthogonal, atomic tags: one tag = one concept; stack, never compound (bio:rna-protein-interaction + bio:ncrna, NOT bio:ncrna-protein-interaction; met:binding-affinity-prediction + ml:gradient-boosting, NOT met:gradient-boosting-affinity; proc:phase-separation + bio:biomolecular-condensate).",
+      "Reuse before invent: merge synonyms into the canonical tag (bio:rna-protein-complex, bio:rna-binding-protein -> bio:rna-protein-interaction; met:binding-site-identification -> met:binding-residue-prediction; met:motif-enrichment -> met:motif-discovery).",
+      "met: vs tool:: mathematical/scoring functions, algorithms and techniques are met:; tool: is strictly runnable software, libraries, pipelines or web servers; models only described in a paper are ml:/met:.",
+      "No collection duplication: never tag a broad domain a collection name already states.",
+      "Legacy tags (topic/..., type/...) are not canonical and have been removed library-wide. zotmoov is ignored (never added, never removed unless asked).",
+      "Data provenance tags such as data:wwpdb may be kept despite few text hits when the user flagged (OVERRIDE) and approved them.",
+      "Adding a tag to the catalog requires a confirmed write-back. Keep the catalog sorted by prefix, then tag (tools/lint enforce sort)."
+    ],
+    "collections": {
+      "roots": [
+        "Private_Projects",
+        "Shared_Projects",
+        "Unclassified"
+      ],
+      "curated_roots": [
+        "Private_Projects"
+      ],
+      "name_regex": "^[A-Z0-9][A-Za-z0-9]*([_-][A-Z0-9][A-Za-z0-9]*)*$",
+      "max_depth": 4,
+      "depth_note": "Private_Projects counts as Level 1; a 5th level needs user confirmation.",
+      "pdf_root": "/mnt/pdfs-from-host",
+      "zotmoov_source_of_truth": true,
+      "zotmoov_note": "Enabled: the folder tree under pdf_root/Private_Projects mirrors the collection tree; the PDF's parent folder IS the Primary Collection."
+    },
+    "todo_deferred": [
+      "Elephant-1 9B local decision engine (Stage 4): interface still unspecified; only the interactive fallback is active.",
+      "Local embedding/reranker tag ranking (bge-m3 + gte-reranker under /srv/ai/registry/weights/embeddings): untested, deferred.",
+      "Revisit rule: re-run older collections when a new prefix is promoted."
+    ],
+    "form_rules": [
+      "Charset: English, lowercase a-z0-9, single - only; no accents, spaces, / or _ except the leading _ of status tags.",
+      "Stopwords: strip a an the of for and in with.",
+      "Versions: collapse (tool:alphafold, not tool:alphafold-3) unless the paper benchmarks versions against each other.",
+      "Singular for techniques, algorithms, models, molecules, organisms (transformer, rna-seq, crispr-cas9, brca1); plural only for collective categories (bio:biomarkers, data:datasets, ml:embeddings).",
+      "Use unambiguous standard acronyms: llm, gwas, pcr, cnn, gnn.",
+      "Process vs method vs entity: phenomena are proc:, what the investigator applies is met:, molecules/regions/modifications are bio:.",
+      "One concept per tag; pick the prefix by what the thing IS (method vs the tool that implements it); never tag one concept under two prefixes.",
+      "Never remove _ status tags unless the user explicitly says so.",
+      "Tags never repeat collection or folder names."
+    ],
+    "write_back": {
+      "only_after_confirmation": true,
+      "never_use": "edit --tags (replaces all)",
+      "use": "batch --add-tags/--remove-tags"
+    },
+    "data_provenance_override": "A low-hit tag that establishes critical experimental vs predicted data provenance (e.g. data:wwpdb) may bypass the Groundedness/hit-count filter ONLY if the proposal table flags it OVERRIDE and the user confirms."
+  },
+  "tags": [
+    {
+      "tag": "_implement",
+      "prefix": "_",
+      "definition": "Method to implement/reproduce.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "_key-paper",
+      "prefix": "_",
+      "definition": "Key/central paper for my work.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "_reading",
+      "prefix": "_",
+      "definition": "Currently reading.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "_to-read",
+      "prefix": "_",
+      "definition": "Queued for reading.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "app:aptamer-design",
+      "prefix": "app",
+      "definition": "Aptamer design as an application use case. Not the generic design technique (met:rna-design).",
+      "components": "atomic; pair with met:rna-design or met:feature-extraction"
+    },
+    {
+      "tag": "app:rna-therapeutics",
+      "prefix": "app",
+      "definition": "RNA-based therapeutics and vaccines as the motivating or demonstrated application (e.g. designing therapeutic RNA binders). Not the design technique (met:rna-design).",
+      "components": "atomic; pair with met:rna-design or bio:rna-modification"
+    },
+    {
+      "tag": "app:synthetic-biology",
+      "prefix": "app",
+      "definition": "Synthetic-biology engineering use (designing RNA/protein parts) stated as an application of the work.",
+      "components": "atomic; pair with a met: design/prediction tag"
+    },
+    {
+      "tag": "bio:biomolecular-condensate",
+      "prefix": "bio",
+      "definition": "Biomolecular condensates / membraneless assemblies as an entity. The process of forming them is `proc:phase-separation`.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:cas9",
+      "prefix": "bio",
+      "definition": "Cas9 nuclease as a molecular target or component. Not the CRISPR technique.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:circrna",
+      "prefix": "bio",
+      "definition": "Circular RNAs. Always paired with `bio:ncrna`.",
+      "components": "bio:ncrna + this",
+      "requires": [
+        "bio:ncrna"
+      ]
+    },
+    {
+      "tag": "bio:disordered-region",
+      "prefix": "bio",
+      "definition": "Intrinsically disordered regions of proteins as a studied entity.",
+      "components": "atomic; pair with bio:rna-protein-interaction"
+    },
+    {
+      "tag": "bio:dna-dna-interaction",
+      "prefix": "bio",
+      "definition": "DNA-DNA interactions (e.g. chromatin contacts). Reserved, not yet used.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "bio:dna-protein-interaction",
+      "prefix": "bio",
+      "definition": "DNA-protein recognition or binding (canonical order DNA before protein).",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:dsrbd",
+      "prefix": "bio",
+      "definition": "Double-stranded RNA-binding domain.",
+      "components": "atomic; pair with bio:rna-protein-interaction"
+    },
+    {
+      "tag": "bio:g-quadruplex",
+      "prefix": "bio",
+      "definition": "G-quadruplex nucleic-acid structural elements.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:genetic-code",
+      "prefix": "bio",
+      "definition": "The genetic code as a studied entity (codon/amino acid specificity).",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:guide-rna",
+      "prefix": "bio",
+      "definition": "Guide RNA molecules (design or use).",
+      "components": "atomic; pair with bio:cas9"
+    },
+    {
+      "tag": "bio:lncrna",
+      "prefix": "bio",
+      "definition": "Long non-coding RNAs. Always paired with `bio:ncrna`.",
+      "components": "bio:ncrna + this",
+      "requires": [
+        "bio:ncrna"
+      ]
+    },
+    {
+      "tag": "bio:mirna",
+      "prefix": "bio",
+      "definition": "MicroRNAs. Always paired with `bio:ncrna`.",
+      "components": "bio:ncrna + this",
+      "requires": [
+        "bio:ncrna"
+      ]
+    },
+    {
+      "tag": "bio:molecular-chaperone",
+      "prefix": "bio",
+      "definition": "RNA or protein chaperones assisting folding.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:mrna",
+      "prefix": "bio",
+      "definition": "Messenger RNA as the studied RNA class.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:ncrna",
+      "prefix": "bio",
+      "definition": "Non-coding RNA as the base category. Required whenever a subclass (`bio:mirna`, `bio:circrna`, `bio:lncrna`, ...) is tagged.",
+      "components": "atomic base tag"
+    },
+    {
+      "tag": "bio:protein-protein-interaction",
+      "prefix": "bio",
+      "definition": "Protein-protein recognition, binding or complexes.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:pumilio",
+      "prefix": "bio",
+      "definition": "Pumilio RNA-binding protein family.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:rna-dna-interaction",
+      "prefix": "bio",
+      "definition": "RNA-DNA interactions (e.g. R-loops, lncRNA-chromatin). Reserved, not yet used.",
+      "components": "atomic",
+      "status": "reserved"
+    },
+    {
+      "tag": "bio:rna-modification",
+      "prefix": "bio",
+      "definition": "Chemical modifications of RNA as a FUNCTIONAL CLASS (never individual modifications such as m6A or pseudouridine; see granularity rule).",
+      "components": "atomic; pair with bio:ncrna / bio:mrna"
+    },
+    {
+      "tag": "bio:rna-protein-interaction",
+      "prefix": "bio",
+      "definition": "RNA-protein recognition, binding or complexes (incl. RNA-binding proteins, complex structures) Covers the former `rna-protein-complex` and `rna-binding-protein`.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:rna-rna-interaction",
+      "prefix": "bio",
+      "definition": "RNA-RNA interactions (base-pairing between molecules).",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:rna-secondary-structure",
+      "prefix": "bio",
+      "definition": "RNA secondary structure as the studied entity.",
+      "components": "atomic"
+    },
+    {
+      "tag": "bio:rrm",
+      "prefix": "bio",
+      "definition": "RNA recognition motif domain (most common RNA-binding domain).",
+      "components": "atomic; pair with bio:rna-protein-interaction"
+    },
+    {
+      "tag": "bio:synonymous-mutation",
+      "prefix": "bio",
+      "definition": "Synonymous mutation class (not individual point mutations).",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:bipa",
+      "prefix": "data",
+      "definition": "BIPA database of protein-nucleic acid interactions in 3D structures.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:docking-benchmark",
+      "prefix": "data",
+      "definition": "Protein-RNA docking benchmark sets used for training or evaluation.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:encode",
+      "prefix": "data",
+      "definition": "ENCODE project data.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:npinter",
+      "prefix": "data",
+      "definition": "NPInter database of ncRNA interactions.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:pridb",
+      "prefix": "data",
+      "definition": "PRIDB protein-RNA interface database.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:rbpdb",
+      "prefix": "data",
+      "definition": "RBPDB database of RNA-binding specificities.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:rnacompete",
+      "prefix": "data",
+      "definition": "RNAcompete in vitro RNA-binding dataset.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:rnact",
+      "prefix": "data",
+      "definition": "RNAct database of predicted and experimental protein-RNA interactions.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:rpi2241",
+      "prefix": "data",
+      "definition": "RPI2241 ncRNA-protein interaction dataset.",
+      "components": "atomic"
+    },
+    {
+      "tag": "data:wwpdb",
+      "prefix": "data",
+      "definition": "World Wide Protein Data Bank structures as the data source.",
+      "components": "atomic"
+    },
+    {
+      "tag": "dis:cancer",
+      "prefix": "dis",
+      "definition": "Cancer/tumour disease class as a studied context (disease annotations, cancer cell lines). Not a molecular target (bio:) or therapy (app:).",
+      "components": "atomic; pair with a bio: entity or data: resource"
+    },
+    {
+      "tag": "met:accessible-surface-area",
+      "prefix": "met",
+      "definition": "Accessible/relative surface area calculations.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:alanine-scanning",
+      "prefix": "met",
+      "definition": "Computational or experimental alanine scanning.",
+      "components": "atomic; pair with met:hot-spot-analysis"
+    },
+    {
+      "tag": "met:binding-affinity-prediction",
+      "prefix": "met",
+      "definition": "Predicting binding strength (e.g. ΔG, Kd). Not residue-level.",
+      "components": "atomic; pair with an ml: model"
+    },
+    {
+      "tag": "met:binding-residue-prediction",
+      "prefix": "met",
+      "definition": "Identifying binding residues or sites (residue/site-level). Covers former `binding-site-identification`.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:binding-site-scanning",
+      "prefix": "met",
+      "definition": "Scanning sequences for known binding sites or motifs.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:buried-surface-area",
+      "prefix": "met",
+      "definition": "Buried surface area analysis of interfaces.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:cest-nmr",
+      "prefix": "met",
+      "definition": "CEST NMR for sparsely populated conformational states. Stack with `met:nmr`.",
+      "components": "met:nmr + this",
+      "requires": [
+        "met:nmr"
+      ]
+    },
+    {
+      "tag": "met:chirp-seq",
+      "prefix": "met",
+      "definition": "ChIRP-seq RNA-chromatin mapping assay.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:clip-seq",
+      "prefix": "met",
+      "definition": "CLIP-seq family of crosslinking assays (use `met:eclip` for eCLIP specifically).",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:contact-map",
+      "prefix": "met",
+      "definition": "Residue/atomic contact map analysis.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:cryo-em",
+      "prefix": "met",
+      "definition": "Cryo-electron microscopy structure determination.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:disorder-prediction",
+      "prefix": "met",
+      "definition": "Predicting intrinsically disordered regions.",
+      "components": "atomic; pair with bio:disordered-region"
+    },
+    {
+      "tag": "met:eclip",
+      "prefix": "met",
+      "definition": "eCLIP / eCLIP-seq crosslinking assay.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:evolutionary-analysis",
+      "prefix": "met",
+      "definition": "Evolutionary/conservation-rate analysis of proteins or interfaces.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:feature-extraction",
+      "prefix": "met",
+      "definition": "Extracting features for downstream predictors.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:feature-selection",
+      "prefix": "met",
+      "definition": "Selecting predictive features for a model.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:genetic-algorithm",
+      "prefix": "met",
+      "definition": "Genetic algorithm optimization technique.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:hot-spot-analysis",
+      "prefix": "met",
+      "definition": "Analysis of interface hot-spot residues.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:hydrogen-bond-analysis",
+      "prefix": "met",
+      "definition": "Analysis of hydrogen bonds in structures.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:iclip",
+      "prefix": "met",
+      "definition": "iCLIP crosslinking assay. Stack with `met:clip-seq`.",
+      "components": "met:clip-seq + this",
+      "requires": [
+        "met:clip-seq"
+      ]
+    },
+    {
+      "tag": "met:interaction-prediction",
+      "prefix": "met",
+      "definition": "Predicting whether or which molecules interact. Not affinity (`met:binding-affinity-prediction`) or residue-level (`met:binding-residue-prediction`).",
+      "components": "atomic; pair with a bio:*-interaction tag"
+    },
+    {
+      "tag": "met:interaction-propensity",
+      "prefix": "met",
+      "definition": "Amino acid-nucleotide pairing/contact propensities.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:interface-analysis",
+      "prefix": "met",
+      "definition": "Analysis of molecular interface properties (size, composition, contacts).",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:interolog-analysis",
+      "prefix": "met",
+      "definition": "Analysis of structurally homologous interfaces (interologs).",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:lambda-dynamics",
+      "prefix": "met",
+      "definition": "λ-dynamics alchemical free-energy method.",
+      "components": "atomic; pair with met:molecular-dynamics"
+    },
+    {
+      "tag": "met:metainference",
+      "prefix": "met",
+      "definition": "Metainference integration of experimental data into MD.",
+      "components": "atomic; pair with met:molecular-dynamics"
+    },
+    {
+      "tag": "met:molecular-docking",
+      "prefix": "met",
+      "definition": "Docking of molecules/complexes (sampling plus scoring).",
+      "components": "atomic; pair with met:scoring-function"
+    },
+    {
+      "tag": "met:molecular-dynamics",
+      "prefix": "met",
+      "definition": "Molecular dynamics simulation.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:motif-discovery",
+      "prefix": "met",
+      "definition": "Discovering sequence or binding motifs.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:mutation-effect-analysis",
+      "prefix": "met",
+      "definition": "Assessing the effect of point mutations.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:nmr",
+      "prefix": "met",
+      "definition": "NMR spectroscopy structure determination.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:pars",
+      "prefix": "met",
+      "definition": "Parallel analysis of RNA structure (PARS) probing.",
+      "components": "atomic; pair with met:rna-structure-probing"
+    },
+    {
+      "tag": "met:peak-calling",
+      "prefix": "met",
+      "definition": "Peak calling on sequencing-based binding data.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:poisson-boltzmann",
+      "prefix": "met",
+      "definition": "Poisson-Boltzmann continuum electrostatics and solvation.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:position-weight-matrix",
+      "prefix": "met",
+      "definition": "Position weight matrix motif representation.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:predictor-benchmarking",
+      "prefix": "met",
+      "definition": "Comparing existing predictors on common data.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:residue-conservation",
+      "prefix": "met",
+      "definition": "Evolutionary conservation analysis of residues.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:ribosome-profiling",
+      "prefix": "met",
+      "definition": "Ribosome profiling (Ribo-seq).",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:rna-design",
+      "prefix": "met",
+      "definition": "Computational design of RNA sequences.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:rna-map-analysis",
+      "prefix": "met",
+      "definition": "RNA maps: positional distribution of peaks around landmarks.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:rna-motif-prediction",
+      "prefix": "met",
+      "definition": "Predicting functional or interaction motifs in RNA sequences.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:rna-structure-probing",
+      "prefix": "met",
+      "definition": "Chemical/enzymatic RNA structure probing assays.",
+      "components": "atomic; pair with met:shape"
+    },
+    {
+      "tag": "met:scoring-function",
+      "prefix": "met",
+      "definition": "Scoring/energy functions for ranking structures. Always `met:`, never `tool:`.",
+      "components": "atomic; pair with met:molecular-docking"
+    },
+    {
+      "tag": "met:sequence-based-prediction",
+      "prefix": "met",
+      "definition": "Predictions from sequence only (no structure input).",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:shape",
+      "prefix": "met",
+      "definition": "SHAPE chemistry-based structure probing.",
+      "components": "met:rna-structure-probing + this",
+      "requires": [
+        "met:rna-structure-probing"
+      ]
+    },
+    {
+      "tag": "met:statistical-inference",
+      "prefix": "met",
+      "definition": "Statistical inference approaches.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:structural-alignment",
+      "prefix": "met",
+      "definition": "Alignment of 3D structures or families.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:thermodynamic-ensemble",
+      "prefix": "met",
+      "definition": "Use of Boltzmann ensembles of RNA structures.",
+      "components": "atomic"
+    },
+    {
+      "tag": "met:x-ray-crystallography",
+      "prefix": "met",
+      "definition": "X-ray crystallography structure determination.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:cnn",
+      "prefix": "ml",
+      "definition": "Convolutional neural network.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:deep-learning",
+      "prefix": "ml",
+      "definition": "Deep learning in general; use a specific architecture tag (`ml:cnn`) when one exists.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:foundation-model",
+      "prefix": "ml",
+      "definition": "Large pretrained general-purpose model.",
+      "components": "atomic; pair with a specific architecture"
+    },
+    {
+      "tag": "ml:gradient-boosting",
+      "prefix": "ml",
+      "definition": "Gradient boosted trees/regression trees.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:integrated-gradients",
+      "prefix": "ml",
+      "definition": "Integrated Gradients attribution for model interpretation.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:k-mer-embedding",
+      "prefix": "ml",
+      "definition": "Learned embeddings of k-mers.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:masked-language-model",
+      "prefix": "ml",
+      "definition": "Masked language modelling objective/architecture.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:probabilistic-model",
+      "prefix": "ml",
+      "definition": "Probabilistic/propensity-based statistical model.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:random-forest",
+      "prefix": "ml",
+      "definition": "Random forest classifier/regressor.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:regression-model",
+      "prefix": "ml",
+      "definition": "Generic regression model; use a specific model tag if there is one.",
+      "components": "atomic"
+    },
+    {
+      "tag": "ml:svm",
+      "prefix": "ml",
+      "definition": "Support vector machine.",
+      "components": "atomic"
+    },
+    {
+      "tag": "proc:chaperone-folding",
+      "prefix": "proc",
+      "definition": "Chaperone-assisted folding of RNA or proteins as a process. The chaperone itself is bio:molecular-chaperone.",
+      "components": "atomic; pair with bio:molecular-chaperone"
+    },
+    {
+      "tag": "proc:conformational-change",
+      "prefix": "proc",
+      "definition": "Conformational change, plasticity or dynamics of a biomolecule (e.g. upon binding) as a natural process. The method used to study it is met: (met:molecular-dynamics, met:cest-nmr).",
+      "components": "atomic; pair with bio:rna-protein-interaction"
+    },
+    {
+      "tag": "proc:disorder-to-order-transition",
+      "prefix": "proc",
+      "definition": "Folding of disordered regions upon binding.",
+      "components": "atomic; pair with bio:disordered-region"
+    },
+    {
+      "tag": "proc:phase-separation",
+      "prefix": "proc",
+      "definition": "Liquid-liquid phase separation / condensate formation.",
+      "components": "atomic; pair with bio:biomolecular-condensate"
+    },
+    {
+      "tag": "proc:translation",
+      "prefix": "proc",
+      "definition": "Translation of RNA into protein (incl. small ORF translation of lncRNAs) as the biological process studied. The assay is met:ribosome-profiling.",
+      "components": "atomic; pair with met:ribosome-profiling or bio:mrna"
+    },
+    {
+      "tag": "tool:apbs",
+      "prefix": "tool",
+      "definition": "APBS electrostatics solver (runnable software).",
+      "components": "pair with met:poisson-boltzmann"
+    },
+    {
+      "tag": "tool:catrapid",
+      "prefix": "tool",
+      "definition": "catRAPID protein-RNA interaction prediction server.",
+      "components": "pair with met:interaction-prediction"
+    },
+    {
+      "tag": "tool:charmm",
+      "prefix": "tool",
+      "definition": "CHARMM molecular simulation software.",
+      "components": "pair with met:molecular-dynamics"
+    },
+    {
+      "tag": "tool:cocomaps",
+      "prefix": "tool",
+      "definition": "COCOMAPS 2.0 interface analysis web server.",
+      "components": "pair with met:interface-analysis"
+    },
+    {
+      "tag": "tool:pdb2pqr",
+      "prefix": "tool",
+      "definition": "PDB2PQR structure-preparation software for APBS.",
+      "components": "atomic"
+    },
+    {
+      "tag": "tool:predprba",
+      "prefix": "tool",
+      "definition": "PredPRBA web server for protein-RNA binding affinity.",
+      "components": "atomic; pair with met:binding-affinity-prediction"
+    },
+    {
+      "tag": "tool:pri-hotscore",
+      "prefix": "tool",
+      "definition": "PRI HotScore web server for protein-RNA hotspot scoring.",
+      "components": "pair with met:hot-spot-analysis"
+    },
+    {
+      "tag": "tool:rbpsignal",
+      "prefix": "tool",
+      "definition": "RBPSignal tool/web server for RBP binding signals.",
+      "components": "atomic"
+    },
+    {
+      "tag": "tool:regrna",
+      "prefix": "tool",
+      "definition": "RegRNA 3.0 RNA motif analysis web server/workflow.",
+      "components": "pair with met:rna-motif-prediction"
+    },
+    {
+      "tag": "tool:rpinbase",
+      "prefix": "tool",
+      "definition": "RPINBASE online feature-extraction toolbox.",
+      "components": "pair with met:feature-extraction"
+    },
+    {
+      "tag": "tool:rrmscorer",
+      "prefix": "tool",
+      "definition": "RRMScorer RRM binding-preference web server.",
+      "components": "pair with bio:rrm"
+    }
+  ]
+}
