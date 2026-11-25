@@ -1,0 +1,20 @@
+[upstream]
+type = "incus"
+container = "c1-gui-u24-zotero"
+user = "ubuntu"
+package = "zotero-mcp-server"
+
+# Devuelve únicamente la cadena de versión (ej: v0.17.4)
+version_cmd = "uv tool list | awk '/^zotero-mcp-server / {print $2}'"
+
+# Actualiza el paquete y refresca el skill en el workspace de Zotero Agent
+upgrade_cmd = "uv tool upgrade 'zotero-mcp-server[all]' && zotero-mcp install-skill --dir ~/Zotero-Agent || true"
+
+# Ruta origen dentro del contenedor y archivos a extraer
+source_dir = "/home/ubuntu/Zotero-Agent/.agents/skills/zotero-cli"
+files = ["SKILL.md", "reference.md"]
+
+[commit]
+scope = "third-party"
+use_pi = true
+pi_repo_mount = "/mnt/skills-collection"
