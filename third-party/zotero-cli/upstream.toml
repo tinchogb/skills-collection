@@ -17,4 +17,6 @@ files = ["SKILL.md", "reference.md"]
 [commit]
 scope = "third-party"
 use_pi = true
+pi_model = "vllm/qwen3.8"
+pi_timeout = 90
 pi_repo_mount = "/mnt/skills-collection"

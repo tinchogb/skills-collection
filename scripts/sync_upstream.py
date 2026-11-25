@@ -22,9 +22,17 @@ def run(
     cwd: Path = REPO_ROOT,
     check: bool = True,
     capture: bool = True,
+    timeout: int | None = None,
 ) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=capture)
-
+    return subprocess.run(
+        cmd,
+        cwd=cwd,
+        check=check,
+        text=True,
+        capture_output=capture,
+        stdin=subprocess.DEVNULL if capture else None,
+        timeout=timeout,
+    )
 
 def check_host_dependencies(require_git_clean: bool = False, require_skillm: bool = False) -> None:
     required_bins = ["incus", "git"]
@@ -60,11 +68,13 @@ def incus_exec(
     shell_cmd: str,
     check: bool = True,
     capture: bool = True,
+    timeout: int | None = None,
 ) -> subprocess.CompletedProcess:
     return run(
         ["incus", "exec", container, "--", "su", "-", user, "-c", shell_cmd],
         check=check,
         capture=capture,
+        timeout=timeout,
     )
 
 
@@ -145,25 +155,38 @@ def ask_pi_commit_msg(cfg: dict, skill_name: str, old_ver: str, new_ver: str) ->
     commit_cfg = cfg.get("commit", {})
     repo_mount = commit_cfg.get("pi_repo_mount", "/mnt/skills-collection")
     scope = commit_cfg.get("scope", "third-party")
+    model = commit_cfg.get("pi_model", "vllm/qwen3.8")
+    timeout = int(commit_cfg.get("pi_timeout", 90))
+    fallback_msg = f"docs({scope}): sync {skill_name} skill to {new_ver}"
 
     pi_check = incus_exec(container, user, "command -v pi", check=False)
     if pi_check.returncode != 0:
         print("! Aviso: 'pi' no está disponible en el contenedor; usando mensaje estándar.")
-        return f"docs({scope}): sync {skill_name} skill to {new_ver}"
+        return fallback_msg
 
     prompt = (
         f"Revisa el git diff en third-party/{skill_name} y los últimos commits con git log -n 5. "
         f"Responde ÚNICAMENTE con un mensaje de commit en formato Conventional Commits "
-        f"(primera línea: docs({scope}): sync {skill_name} skill to {new_ver}, seguida de una línea en blanco y un párrafo corto "
+        f"(primera línea: {fallback_msg}, seguida de una línea en blanco y un párrafo corto "
         f"resumiendo los cambios funcionales clave respecto a {old_ver}). Sin bloques markdown ni texto adicional."
     )
 
-    with ensure_repo_mounted(container, repo_mount):
-        cmd = f"cd {repo_mount} && pi -p {subprocess.list2cmdline([prompt])}"
-        res = incus_exec(container, user, cmd)
+    pi_cmd = (
+        f"cd {repo_mount} && pi -p --no-session "
+        f"--model {subprocess.list2cmdline([model])} "
+        f"--tools bash,read "
+        f"{subprocess.list2cmdline([prompt])} </dev/null"
+    )
 
-    msg = res.stdout.strip().strip("`")
-    return msg if msg else f"docs({scope}): sync {skill_name} skill to {new_ver}"
+    try:
+        with ensure_repo_mounted(container, repo_mount):
+            res = incus_exec(container, user, pi_cmd, timeout=timeout)
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+        print(f"! Aviso: Pi no pudo generar el mensaje ({exc}); usando mensaje estándar.")
+        return fallback_msg
+
+    msg = res.stdout.strip().strip("`").strip()
+    return msg if msg else fallback_msg
 
 
 def cmd_status(skills: list[Path]) -> None:
